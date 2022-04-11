@@ -1,16 +1,17 @@
 #===============================================================================
-# * Roulette mini-game - by FL (Credits will be apreciated)
+# * Roulette Minigame - by FL (Credits will be apreciated)
 #===============================================================================
 #
 # This script is for Pokémon Essentials. It's the Roulette Game Corner minigame
 # from Ruby/Sapphire/Emerald. This minigame isn't an exact adaptation of the
 # official one, the ball never stops at an occupied slot, so there's no
-# Taillow and Shroomish bonus. The ball chance is 1/free slots quantity.
+# Taillow and Shroomish bonus.
 #
-#===============================================================================
+#== INSTALLATION ===============================================================
 #
-# To this script works, put it above main, create "Roulette" folder at
-# Graphics/Pictures and put the pictures (may works with other sizes):
+# To this script works, put it above main or convert into a plugin. Create 
+# "Roulette" folder at Graphics/Pictures and put the pictures (may works with
+# other sizes):
 # -  30x30  ball
 # -  16x16  ballicon 
 # -  16x16  ballusedicon
@@ -20,15 +21,25 @@
 # - 240x46  selectedcolor
 # -  46x46  selectedsingle
 # -  46x192 selectedspecies
-# - 244x196 table
-#  
-# To call this script, use the script command 'pbRoulette(X)' where X is the
-# wager number.
+# - 244x196 table  
+#
+#=== HOW TO USE ================================================================
+#
+# Use the script command 'pbRoulette(X)' where X is the wager number.
 #
 #===============================================================================
 
+if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
+  PluginManager.register({                                                 
+    :name    => "Roulette Minigame",                                        
+    :version => "1.0.2",                                                     
+    :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
+    :credits => "FL"
+  })
+end
+
 class RouletteScene
-  TABLEPOSITIONS=[
+  TABLE_POSITIONS=[
     [1,10, 7,4],
     [5, 2,11,8],
     [9, 6, 3,0]
@@ -37,7 +48,7 @@ class RouletteScene
   ROWS=3
   ROUNDS=6 # Before clean the board
   
-  class RouletteCursor
+  class Cursor
     attr_reader :sprite
     attr_reader :indexX
     attr_reader :indexY
@@ -102,11 +113,11 @@ class RouletteScene
     
     def bentPositions
       if @indexX==0
-        return TABLEPOSITIONS[@indexY-1]
+        return TABLE_POSITIONS[@indexY-1]
       elsif @indexY==0
-        return TABLEPOSITIONS.transpose[@indexX-1]
+        return TABLE_POSITIONS.transpose[@indexX-1]
       else
-        return [TABLEPOSITIONS[@indexY-1][@indexX-1]]    
+        return [TABLE_POSITIONS[@indexY-1][@indexX-1]]    
       end    
     end 
     
@@ -156,7 +167,7 @@ class RouletteScene
     # the ball picture will be at the top to create the illusion that the
     # ball is spinning.
     # The lower the height, the lower the distance to the roulette center.
-    def adjustBitmapBall(i,height) # 
+    def adjustBitmapBall(i,height)
       bitmapBall = Bitmap.new("Graphics/Pictures/Roulette/ball")
       @balls[i].bitmap=Bitmap.new(30,height)
       @balls[i].bitmap.blt(0,0,bitmapBall,bitmapBall.rect)
@@ -204,8 +215,9 @@ class RouletteScene
     @sprites["background"]=IconSprite.new(0,0,@viewport)
     @sprites["background"].bitmap=Bitmap.new(Graphics.width,Graphics.height)
     @sprites["background"].bitmap.fill_rect(0,0,
-        @sprites["background"].bitmap.width, 
-        @sprites["background"].bitmap.height, @backgroundColor)
+      @sprites["background"].bitmap.width, 
+      @sprites["background"].bitmap.height, @backgroundColor
+    )
     @sprites["roulette"]=IconSprite.new(0,0,@viewport)
     @sprites["roulette"].setBitmap("Graphics/Pictures/Roulette/roulette")
     @sprites["roulette"].x=@sprites["roulette"].bitmap.width/2+4
@@ -219,7 +231,8 @@ class RouletteScene
     @sprites["table"].y=Graphics.height-@sprites["table"].bitmap.height-16
     @sprites["multiplierbox"]=IconSprite.new(0,0,@viewport)
     @sprites["multiplierbox"].setBitmap(
-        "Graphics/Pictures/Roulette/multiplierbox")
+      "Graphics/Pictures/Roulette/multiplierbox"
+    )
     @sprites["multiplierbox"].x=@sprites["table"].x-12
     @sprites["multiplierbox"].y=@sprites["table"].y+6
     @sprites["creditbox"]=IconSprite.new(0,0,@viewport)
@@ -237,19 +250,23 @@ class RouletteScene
       # Right to left
       @sprites["ballicon#{i}"].x=(@sprites["creditbox"].x+10+(ROUNDS-i-1)*16)
       @sprites["ballicon#{i}"].y=(
-          @sprites["creditbox"].y+@sprites["creditbox"].bitmap.height+2)
+          @sprites["creditbox"].y+@sprites["creditbox"].bitmap.height+2
+      )
     end  
     @sprites["cursor"]=IconSprite.new(0,0,@viewport)
     @playedBalls=[]
     (COLUMNS*ROWS).times do
       @playedBalls.push(false)
     end
-    @cursor = RouletteCursor.new(@sprites["cursor"],@playedBalls,
-        @sprites["table"].x,@sprites["table"].y)
+    @cursor = Cursor.new(
+      @sprites["cursor"],@playedBalls,@sprites["table"].x,@sprites["table"].y
+    )
     @sprites["overlaycredits"]=BitmapSprite.new(
-        Graphics.width,Graphics.height,@viewport)
+        Graphics.width,Graphics.height,@viewport
+    )
     @sprites["overlaymultiplier"]=BitmapSprite.new(
-        Graphics.width,Graphics.height,@viewport)
+        Graphics.width,Graphics.height,@viewport
+    )
     pbSetSystemFont(@sprites["overlaycredits"].bitmap)
     pbSetSystemFont(@sprites["overlaymultiplier"].bitmap)
     @sprites["overlaycredits"].bitmap.font.bold=true
@@ -262,7 +279,9 @@ class RouletteScene
     @exit=false
     pbDrawCredits
     pbFadeInAndShow(@sprites) { update }
-    pbMessage(_INTL("Place your wager with the arrows, then press the C key."))
+    displayMessage(
+	  _INTL("Place your wager with the arrows, then press the C key.")
+	)
     pbDrawMultiplier
   end
   
@@ -273,35 +292,34 @@ class RouletteScene
     return if multiplier==0
     textPosition=[multiplier.to_s,
        @sprites["multiplierbox"].x+@sprites["multiplierbox"].bitmap.width-8,
-       @sprites["multiplierbox"].y,
+       @sprites["multiplierbox"].y-6,
        true,Color.new(248,168,136),Color.new(96,96,112)
     ]
-    # Color.new(248,168,136)
-    # Color.new(248,80,56)
-    pbDrawTextPositions(overlay,[textPosition])
+    RouletteBridge.drawTextPositions(overlay,[textPosition])
   end
 
   def pbDrawCredits
     overlay=@sprites["overlaycredits"].bitmap
     overlay.clear     
-    textPosition=[$PokemonGlobal.coins.to_s,
+    textPosition=[RouletteBridge.coins.to_s,
         @sprites["creditbox"].x+@sprites["creditbox"].bitmap.width-26,
-        @sprites["creditbox"].y+26,
+        @sprites["creditbox"].y+20,
         true,Color.new(248,248,248),Color.new(0,0,0)
     ]
-    pbDrawTextPositions(overlay,[textPosition])
+    RouletteBridge.drawTextPositions(overlay,[textPosition])
   end
   
   # Adds the coins and updates the credit box. Return false if coins+number<0
   def pbAddCredits(number)
-    return false if $PokemonGlobal.coins+number<0
-    $PokemonGlobal.coins+=number
-    $PokemonGlobal.coins=getMaxCoins if $PokemonGlobal.coins>getMaxCoins
+    return false if RouletteBridge.coins+number<0
+    RouletteBridge.coins = [
+      RouletteBridge.getMaxCoins, RouletteBridge.coins+number
+    ].min
     pbDrawCredits
     return true
   end  
   
-  def pbMessage(message)
+  def displayMessage(message)
     Kernel.pbMessage(message){update}
   end  
   
@@ -321,7 +339,7 @@ class RouletteScene
       else
         if Input.trigger?(Input::C) 
           if @cursor.multiplier!=0 # Valid bent
-            pbSEPlay("SlotsCoin")
+            pbSEPlay(RouletteBridge.getAudioName("Slots coin"))
             pbAddCredits(-@wager)
             @centralizeRoulette = !@centralizeRoulette
             @waitingMovement = true
@@ -351,8 +369,10 @@ class RouletteScene
     @sprites["overlaymultiplier"].x+=speed
     @movedDistance+=speed 
     # The conditions for finish centralize and decentralize
-    if ( @centralizeRoulette && Graphics.width<(@sprites["table"].x+48) ||
-        !@centralizeRoulette && @movedDistance==0)
+    if ( 
+      @centralizeRoulette && Graphics.width<(@sprites["table"].x+48) ||
+      !@centralizeRoulette && @movedDistance==0
+    )
       @waitingMovement = false
       @centralizeRoulette ? pbStartSpin : pbEndSpin
     end
@@ -363,7 +383,8 @@ class RouletteScene
   def pbStartSpin
     i=RouletteScreen.count(@playedBalls,true)
     @sprites["ballicon#{i}"].setBitmap(
-        "Graphics/Pictures/Roulette/ballusedicon")
+      "Graphics/Pictures/Roulette/ballusedicon"
+    )
     @sprites["ballicon#{i}"].color=@usedIconColor
     @result=-1    
     loop do
@@ -372,7 +393,7 @@ class RouletteScene
     end
     @roulette.addBall(@sprites["ball#{i}"])
     @roulette.adjustBitmapBall(i,148)    
-    @variableDegrees=10*3*TABLEPOSITIONS.flatten[@result]+SPINS[3]
+    @variableDegrees=10*3*TABLE_POSITIONS.flatten[@result]+SPINS[3]
     @degreesToSpin=SPINS[0]+SPINS[1]+SPINS[2]+@variableDegrees
     # Rolling Ball ME should starts here.
   end
@@ -409,7 +430,7 @@ class RouletteScene
     @roulette.adjustBitmapBall(i,height) if height!=0
     if @degreesToSpin==0 # End
       # Rolling Ball BGS should stops here.
-      pbSEPlay("balldrop")
+      pbSEPlay(RouletteBridge.getAudioName("Battle ball drop"))
       @centralizeRoulette = !@centralizeRoulette
       @waitingMovement = true
     end  
@@ -420,23 +441,29 @@ class RouletteScene
     @sprites["balltable#{i}"].visible=true
     @sprites["balltable#{i}"].x=6+@sprites["table"].x+(@result%COLUMNS+1)*48
     @sprites["balltable#{i}"].y=6+@sprites["table"].y+(@result/COLUMNS+1)*48
-    wins = @cursor.bentPositions.include?(TABLEPOSITIONS.flatten[@result])
+    wins = @cursor.bentPositions.include?(TABLE_POSITIONS.flatten[@result])
     if wins
       multiplier = @cursor.multiplier
       if multiplier==12
-        pbMessage(_INTL("\\me[SlotsBigWin]Jackpot!\\wtnp[50]"))
+        displayMessage(_INTL(
+          "\\me[{1}]Jackpot!\\wtnp[50]",
+          RouletteBridge.getAudioName("Slots big win")
+        ))
       else
-        pbMessage(_INTL("\\me[SlotsWin]It's a hit!\\wtnp[30]"))
+        displayMessage(_INTL(
+          "\\me[{1}]It's a hit!\\wtnp[30]",
+          RouletteBridge.getAudioName("Slots win")
+        ))
       end
-      pbMessage(_INTL("You've won {1} Coins!",@wager*multiplier))
+      displayMessage(_INTL("You've won {1} Coins!",@wager*multiplier))
       pbAddCredits(@wager*multiplier)
     else  
       pbPlayBuzzerSE()
-      pbMessage(_INTL("Nothing doing!"))
+      displayMessage(_INTL("Nothing doing!"))
     end
     @playedBalls[@result]=true
     if i==(ROUNDS-1) # Clear
-      pbMessage(_INTL("The Roulette board will be cleared."))
+      displayMessage(_INTL("The Roulette board will be cleared."))
       @roulette.clearBalls
       @playedBalls.clear
       (COLUMNS*ROWS).times do
@@ -445,14 +472,15 @@ class RouletteScene
       for index in 0...ROUNDS
         @sprites["balltable#{index}"].visible=false
         @sprites["ballicon#{index}"].setBitmap(
-            "Graphics/Pictures/Roulette/ballicon")
+            "Graphics/Pictures/Roulette/ballicon"
+        )
         @sprites["ballicon#{index}"].color=Color.new(0,0,0,0)
       end  
     end  
     pbDrawMultiplier
     if pbConfirmMessage(_INTL("Keep playing?"))
-      if $PokemonGlobal.coins<@wager
-        pbMessage(_INTL("You don't have enough Coins to play!"))
+      if RouletteBridge.coins<@wager
+        displayMessage(_INTL("You don't have enough Coins to play!"))
         @exit=true 
       end
     else  
@@ -469,7 +497,7 @@ end
 
 
 class RouletteScreen
-  # Added since RGSS Array class doesn't have count
+  # Added since Ruby 1.8 Array class doesn't have count
   def self.count(array, value)
     ret=0
     for element in array
@@ -490,14 +518,14 @@ class RouletteScreen
 end
 
 def pbRoulette(wager=1)
-  if $PokemonBag.pbQuantity(PBItems::COINCASE)<=0
+  if !RouletteBridge.hasCoinCase?
     Kernel.pbMessage(_INTL("It's a Roulette."))
   elsif Kernel.pbConfirmMessage(_INTL(
-      "\\CNThe minimum wanger at this table is {1}. Do you want to play?",
-      wager))
-    if $PokemonGlobal.coins<wager
+    "\\CNThe minimum wanger at this table is {1}. Do you want to play?", wager
+  ))
+    if RouletteBridge.coins<wager
       Kernel.pbMessage(_INTL("You don't have enough Coins to play!"))
-    elsif $PokemonGlobal.coins==getMaxCoins
+    elsif RouletteBridge.coins==RouletteBridge.getMaxCoins
       Kernel.pbMessage(_INTL("Your Coin Case is full!"))  
     else    
       scene=RouletteScene.new
@@ -507,4 +535,66 @@ def pbRoulette(wager=1)
   end
 end
 
-def getMaxCoins; defined?(MAX_COINS) ? MAX_COINS : MAXCOINS; end
+# Essentials multiversion layer
+module RouletteBridge
+  @@audioNameHash = nil
+
+  def self.v19Plus?
+    return defined?(Settings) && Settings.const_defined?(:MAX_COINS)
+  end
+
+  def self.v18?
+    return defined?(MAX_COINS)
+  end
+
+  def self.v17?
+    return defined?(MEGARINGS)
+  end
+
+  def self.v17Plus?
+    return v17? || v18? || v19Plus?
+  end
+
+  def self.coins
+    return (v19Plus? ? $Trainer : $PokemonGlobal).coins
+  end
+
+  def self.coins=(value)
+    (v19Plus? ? $Trainer : $PokemonGlobal).coins = value
+  end
+
+  def self.getMaxCoins
+    return Settings::MAX_COINS if v19Plus?
+    return MAX_COINS if v18?
+    return MAXCOINS
+  end
+
+  def self.hasCoinCase?
+    return $PokemonBag.pbQuantity(v19Plus? ? :COINCASE : PBItems::COINCASE) > 0
+  end
+
+  def self.drawTextPositions(bitmap,textpos)
+    if !v19Plus?
+      for singleTextPos in textpos
+        singleTextPos[2]+=6
+      end
+    end
+    return pbDrawTextPositions(bitmap,textpos)
+  end
+
+  def self.getAudioName(baseName)
+    if !@@audioNameHash
+      if !v17Plus?
+        @@audioNameHash = {
+          "Battle ball drop" => "balldrop"   ,
+          "Slots coin"       => "SlotsCoin"  ,
+          "Slots win"        => "SlotsWin"   ,
+          "Slots big win"    => "SlotsBigWin",
+        }
+      else
+        @@audioNameHash = {}
+      end
+    end
+    return @@audioNameHash.fetch(baseName, baseName)  
+  end
+end
