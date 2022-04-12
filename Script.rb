@@ -9,9 +9,8 @@
 #
 #== INSTALLATION ===============================================================
 #
-# To this script works, put it above main or convert into a plugin. Create 
-# "Roulette" folder at Graphics/Pictures and put the pictures (may works with
-# other sizes):
+# Put it above main or convert into a plugin. Create "Roulette" folder at 
+# Graphics/Pictures and put the pictures (may works with other sizes):
 # -  30x30  ball
 # -  16x16  ballicon 
 # -  16x16  ballusedicon
@@ -23,16 +22,21 @@
 # -  46x192 selectedspecies
 # - 244x196 table  
 #
+# Add on Audio/SE "Roulette Ball" and "Roulette Ball End" audio files.
+#
 #=== HOW TO USE ================================================================
 #
-# Use the script command 'pbRoulette(X)' where X is the wager number.
+# Use the script command 'roulette(X)' where X is the wager number.
+#
+# You can use 'roulette(1, RouletteScreen::BLUE)' to start the game with a 
+# different board color set. Available color sets are RED, GREEN and BLUE.
 #
 #===============================================================================
 
 if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
   PluginManager.register({                                                 
     :name    => "Roulette Minigame",                                        
-    :version => "1.0.2",                                                     
+    :version => "1.1",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
     :credits => "FL"
   })
@@ -192,26 +196,14 @@ class RouletteScene
     def update
       sumAngle(2)
     end  
-  end  
-  
-  def update
-    pbUpdateSpriteHash(@sprites)
-    @cursor.update
-    @roulette.update
   end
   
-  def pbStartScene(wager)
+  def startScene(wager, backgroundColor, usedIconColor)
     @sprites={} 
     @viewport=Viewport.new(0,0,Graphics.width,Graphics.height)
     @viewport.z=99999
-    # To change the board color and the used icon color, just change the two
-    # below variable. You can set conditions like the wager at official games.
-    @backgroundColor=Color.new(192,32,80)
-    @usedIconColor=Color.new(248,152,160)
-#    if wager>=3 # Activates second table color values
-#      @backgroundColor=Color.new(80,192,32) 
-#      @usedIconColor=Color.new(160,248,152)
-#    end
+    @backgroundColor=backgroundColor
+    @usedIconColor=usedIconColor
     @sprites["background"]=IconSprite.new(0,0,@viewport)
     @sprites["background"].bitmap=Bitmap.new(Graphics.width,Graphics.height)
     @sprites["background"].bitmap.fill_rect(0,0,
@@ -227,18 +219,21 @@ class RouletteScene
     @roulette=RouletteObject.new(@sprites["roulette"])
     @sprites["table"]=IconSprite.new(0,0,@viewport)
     @sprites["table"].setBitmap("Graphics/Pictures/Roulette/table")
-    @sprites["table"].x=Graphics.width-@sprites["table"].bitmap.width-16
-    @sprites["table"].y=Graphics.height-@sprites["table"].bitmap.height-16
+    @sprites["table"].x=Graphics.width-@sprites["table"].bitmap.width-10
+    @sprites["table"].y=Graphics.height-@sprites["table"].bitmap.height-10
     @sprites["multiplierbox"]=IconSprite.new(0,0,@viewport)
     @sprites["multiplierbox"].setBitmap(
       "Graphics/Pictures/Roulette/multiplierbox"
     )
-    @sprites["multiplierbox"].x=@sprites["table"].x-12
+    @sprites["multiplierbox"].x=@sprites["table"].x-14
     @sprites["multiplierbox"].y=@sprites["table"].y+6
+    @sprites["multiplierbox"].z=1
+    @multiplierBoxUnclampedX = @sprites["multiplierbox"].x
     @sprites["creditbox"]=IconSprite.new(0,0,@viewport)
     @sprites["creditbox"].setBitmap("Graphics/Pictures/Roulette/creditbox")
-    @sprites["creditbox"].x=Graphics.width-@sprites["creditbox"].bitmap.width-8
-    @sprites["creditbox"].y=8
+    @sprites["creditbox"].x=Graphics.width-@sprites["creditbox"].bitmap.width-6
+    @sprites["creditbox"].y=6
+    @sprites["creditbox"].z=1
     for i in 0...ROUNDS
       @sprites["ball#{i}"]=IconSprite.new(0,0,@viewport)
       @sprites["ball#{i}"].visible=false
@@ -264,9 +259,11 @@ class RouletteScene
     @sprites["overlaycredits"]=BitmapSprite.new(
         Graphics.width,Graphics.height,@viewport
     )
+    @sprites["overlaycredits"].z=2
     @sprites["overlaymultiplier"]=BitmapSprite.new(
         Graphics.width,Graphics.height,@viewport
     )
+    @sprites["overlaymultiplier"].z=2
     pbSetSystemFont(@sprites["overlaycredits"].bitmap)
     pbSetSystemFont(@sprites["overlaymultiplier"].bitmap)
     @sprites["overlaycredits"].bitmap.font.bold=true
@@ -276,32 +273,48 @@ class RouletteScene
     @movedDistance = 0
     @waitingMovement = false
     @degreesToSpin = 0
+    @framesRemainingToBlink = 0
+    @displayedCredits = RouletteBridge.coins
     @exit=false
-    pbDrawCredits
+    drawCredits
     pbFadeInAndShow(@sprites) { update }
     displayMessage(
-	  _INTL("Place your wager with the arrows, then press the C key.")
-	)
-    pbDrawMultiplier
+      _INTL("Place your wager with the arrows, then press the C key.")
+    )
+    drawMultiplier
+  end  
+  
+  def update
+    pbUpdateSpriteHash(@sprites)
+    @cursor.update
+    @roulette.update
+    if @displayedCredits < RouletteBridge.coins && Graphics.frame_count % 3 == 0
+      @displayedCredits+=1
+      drawCredits
+    end
   end
   
-  def pbDrawMultiplier
+  def drawMultiplier
     overlay=@sprites["overlaymultiplier"].bitmap
     overlay.clear     
     multiplier=@cursor.multiplier
     return if multiplier==0
+    baseColor = {
+      6 => Color.new(0xf7,0xc7,0x0e), # Yellow
+      4 => Color.new(0xc1,0xa1,0xf4), # Purple
+      3 => Color.new(0xf8,0xf8,0xf8), # White
+    }.fetch(multiplier, Color.new(0xf8,0xa8,0x88)) # Default Red
     textPosition=[multiplier.to_s,
        @sprites["multiplierbox"].x+@sprites["multiplierbox"].bitmap.width-8,
-       @sprites["multiplierbox"].y-6,
-       true,Color.new(248,168,136),Color.new(96,96,112)
+       @sprites["multiplierbox"].y-6,true,baseColor,Color.new(0x60,0x60,0x70)
     ]
     RouletteBridge.drawTextPositions(overlay,[textPosition])
   end
 
-  def pbDrawCredits
+  def drawCredits
     overlay=@sprites["overlaycredits"].bitmap
     overlay.clear     
-    textPosition=[RouletteBridge.coins.to_s,
+    textPosition=[@displayedCredits.to_s,
         @sprites["creditbox"].x+@sprites["creditbox"].bitmap.width-26,
         @sprites["creditbox"].y+20,
         true,Color.new(248,248,248),Color.new(0,0,0)
@@ -310,12 +323,15 @@ class RouletteScene
   end
   
   # Adds the coins and updates the credit box. Return false if coins+number<0
-  def pbAddCredits(number)
+  def addCredits(number, instant=true)
     return false if RouletteBridge.coins+number<0
     RouletteBridge.coins = [
       RouletteBridge.getMaxCoins, RouletteBridge.coins+number
     ].min
-    pbDrawCredits
+    if instant
+      @displayedCredits = RouletteBridge.coins
+      drawCredits
+    end
     return true
   end  
   
@@ -323,24 +339,26 @@ class RouletteScene
     Kernel.pbMessage(message){update}
   end  
   
-  def pbConfirmMessage(message)
+  def confirmMessage(message)
     return Kernel.pbConfirmMessage(message){update}
   end  
   
-  def pbMain
+  def main
     loop do
       Graphics.update
       Input.update
       self.update
-      if @waitingMovement
-        pbMovePictures
+      if @framesRemainingToBlink>0
+        blink
+      elsif @waitingMovement
+        movePictures
       elsif @degreesToSpin>0
-        pbSpinRoulette
+        spinRoulette
       else
         if Input.trigger?(Input::C) 
-          if @cursor.multiplier!=0 # Valid bent
+          if @cursor.multiplier!=0
             pbSEPlay(RouletteBridge.getAudioName("Slots coin"))
-            pbAddCredits(-@wager)
+            addCredits(-@wager)
             @centralizeRoulette = !@centralizeRoulette
             @waitingMovement = true
           else  
@@ -348,39 +366,45 @@ class RouletteScene
           end
         end
         break if @exit
-        if Input.trigger?(Input::UP);   @cursor.moveUp;   pbDrawMultiplier;end 
-        if Input.trigger?(Input::DOWN); @cursor.moveDown; pbDrawMultiplier;end 
-        if Input.trigger?(Input::LEFT); @cursor.moveLeft; pbDrawMultiplier;end 
-        if Input.trigger?(Input::RIGHT);@cursor.moveRight;pbDrawMultiplier;end 
+        if Input.trigger?(Input::UP);   @cursor.moveUp;   drawMultiplier;end 
+        if Input.trigger?(Input::DOWN); @cursor.moveDown; drawMultiplier;end 
+        if Input.trigger?(Input::LEFT); @cursor.moveLeft; drawMultiplier;end 
+        if Input.trigger?(Input::RIGHT);@cursor.moveRight;drawMultiplier;end 
       end   
     end 
   end
   
-  def pbMovePictures
+  def movePictures
     speed = 12
     speed *= - 1 if !@centralizeRoulette # Reverse the way
+    @movedDistance+=speed
     @roulette.sumX(speed/3)
     @sprites["table"].x+=speed
     for i in 0...RouletteScreen.count(@playedBalls,true)
       @sprites["balltable#{i}"].x+=speed
     end
-    @sprites["multiplierbox"].x+=speed
     @sprites["cursor"].x+=speed
-    @sprites["overlaymultiplier"].x+=speed
-    @movedDistance+=speed 
+    @multiplierBoxUnclampedX+=speed
+    @sprites["multiplierbox"].x = [
+      @multiplierBoxUnclampedX,
+      Graphics.width-@sprites["multiplierbox"].bitmap.width-10
+    ].min
+    @sprites["overlaymultiplier"].x = (
+      @movedDistance+@sprites["multiplierbox"].x-@multiplierBoxUnclampedX
+    )
     # The conditions for finish centralize and decentralize
     if ( 
-      @centralizeRoulette && Graphics.width<(@sprites["table"].x+48) ||
+      @centralizeRoulette && Graphics.width<(@sprites["table"].x) ||
       !@centralizeRoulette && @movedDistance==0
     )
       @waitingMovement = false
-      @centralizeRoulette ? pbStartSpin : pbEndSpin
+      @centralizeRoulette ? startSpin : endSpin
     end
-  end  
+  end 
   
   SPINS=[60*30,36*20,30*10,20*3] # Spins quantity and tiers
   
-  def pbStartSpin
+  def startSpin
     i=RouletteScreen.count(@playedBalls,true)
     @sprites["ballicon#{i}"].setBitmap(
       "Graphics/Pictures/Roulette/ballusedicon"
@@ -395,10 +419,10 @@ class RouletteScene
     @roulette.adjustBitmapBall(i,148)    
     @variableDegrees=10*3*TABLE_POSITIONS.flatten[@result]+SPINS[3]
     @degreesToSpin=SPINS[0]+SPINS[1]+SPINS[2]+@variableDegrees
-    # Rolling Ball ME should starts here.
+    pbSEPlay(RouletteBridge.getAudioName("Roulette Ball"))
   end
   
-  def pbSpinRoulette
+  def spinRoulette
     i=RouletteScreen.count(@playedBalls,true)
     # Spins tier speeds
     if @degreesToSpin>SPINS[1]+SPINS[2]+@variableDegrees
@@ -428,19 +452,40 @@ class RouletteScene
       height=128
     end
     @roulette.adjustBitmapBall(i,height) if height!=0
+    if @degreesToSpin==SPINS[2]+@variableDegrees # Play ending SFX
+      pbSEStop
+      pbSEPlay(RouletteBridge.getAudioName("Roulette Ball End"))
+    end
     if @degreesToSpin==0 # End
-      # Rolling Ball BGS should stops here.
       pbSEPlay(RouletteBridge.getAudioName("Battle ball drop"))
       @centralizeRoulette = !@centralizeRoulette
       @waitingMovement = true
     end  
   end  
   
-  def pbEndSpin
+  BLINK_TIMES = 4
+  FRAMES_PER_BLINK = 4
+  WAIT_AFTER_BLINK = 8
+  BLINK_LAST_WAIT = 2
+
+  def endSpin
     i=RouletteScreen.count(@playedBalls,true)
-    @sprites["balltable#{i}"].visible=true
     @sprites["balltable#{i}"].x=6+@sprites["table"].x+(@result%COLUMNS+1)*48
     @sprites["balltable#{i}"].y=6+@sprites["table"].y+(@result/COLUMNS+1)*48
+    @framesRemainingToBlink = (BLINK_TIMES+BLINK_LAST_WAIT)*FRAMES_PER_BLINK*2
+  end
+
+  def blink
+    i=RouletteScreen.count(@playedBalls,true)
+    @framesRemainingToBlink-=1
+    lastWait = @framesRemainingToBlink / FRAMES_PER_BLINK < BLINK_LAST_WAIT*2
+    @sprites["balltable#{i}"].visible = (
+      @framesRemainingToBlink / FRAMES_PER_BLINK % 2 == 0 || lastWait
+    )
+    processResults if @framesRemainingToBlink==0
+  end
+
+  def processResults
     wins = @cursor.bentPositions.include?(TABLE_POSITIONS.flatten[@result])
     if wins
       multiplier = @cursor.multiplier
@@ -455,14 +500,14 @@ class RouletteScene
           RouletteBridge.getAudioName("Slots win")
         ))
       end
+      addCredits(@wager*multiplier, false)
       displayMessage(_INTL("You've won {1} Coins!",@wager*multiplier))
-      pbAddCredits(@wager*multiplier)
     else  
       pbPlayBuzzerSE()
       displayMessage(_INTL("Nothing doing!"))
     end
     @playedBalls[@result]=true
-    if i==(ROUNDS-1) # Clear
+    if RouletteScreen.count(@playedBalls,true)==(ROUNDS-1) # Clear
       displayMessage(_INTL("The Roulette board will be cleared."))
       @roulette.clearBalls
       @playedBalls.clear
@@ -477,8 +522,8 @@ class RouletteScene
         @sprites["ballicon#{index}"].color=Color.new(0,0,0,0)
       end  
     end  
-    pbDrawMultiplier
-    if pbConfirmMessage(_INTL("Keep playing?"))
+    drawMultiplier
+    if confirmMessage(_INTL("Keep playing?"))
       if RouletteBridge.coins<@wager
         displayMessage(_INTL("You don't have enough Coins to play!"))
         @exit=true 
@@ -486,17 +531,20 @@ class RouletteScene
     else  
       @exit=true 
     end  
-  end  
+  end
 
-  def pbEndScene
+  def endScene
     pbFadeOutAndHide(@sprites) { update }
     pbDisposeSpriteHash(@sprites)
     @viewport.dispose
   end
 end
 
-
 class RouletteScreen
+  RED   = 101
+  GREEN = 102
+  BLUE  = 103
+
   # Added since Ruby 1.8 Array class doesn't have count
   def self.count(array, value)
     ret=0
@@ -510,14 +558,22 @@ class RouletteScreen
     @scene=scene
   end
 
-  def pbStartScreen(wager)
-    @scene.pbStartScene(wager)
-    @scene.pbMain
-    @scene.pbEndScene
+  def startScreen(wager, colorCode)
+    colorCode ||= RED 
+    backgroundAndIconColor = {
+      RED   => [Color.new(0xc0,0x20,0x50), Color.new(0xf8,0x98,0xa0)],
+      GREEN => [Color.new(0x51,0x96,0x31), Color.new(0x84,0xdd,0x57)],
+      BLUE  => [Color.new(0x20,0x50,0xc0), Color.new(0x98,0xa0,0xf8)],
+    }[colorCode]
+    @scene.startScene(
+      wager,backgroundAndIconColor[0],backgroundAndIconColor[1]
+    )
+    @scene.main
+    @scene.endScene
   end
 end
 
-def pbRoulette(wager=1)
+def roulette(wager=1, colorCode=nil)
   if !RouletteBridge.hasCoinCase?
     Kernel.pbMessage(_INTL("It's a Roulette."))
   elsif Kernel.pbConfirmMessage(_INTL(
@@ -527,10 +583,12 @@ def pbRoulette(wager=1)
       Kernel.pbMessage(_INTL("You don't have enough Coins to play!"))
     elsif RouletteBridge.coins==RouletteBridge.getMaxCoins
       Kernel.pbMessage(_INTL("Your Coin Case is full!"))  
-    else    
-      scene=RouletteScene.new
-      screen=RouletteScreen.new(scene)
-      screen.pbStartScreen(wager)
+    else
+      pbFadeOutIn(99999){     
+        scene=RouletteScene.new
+        screen=RouletteScreen.new(scene)
+        screen.startScreen(wager, colorCode)
+      }
     end
   end
 end
