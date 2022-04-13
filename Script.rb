@@ -36,7 +36,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
   PluginManager.register({                                                 
     :name    => "Roulette Minigame",                                        
-    :version => "1.1",                                                     
+    :version => "1.1.1",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
     :credits => "FL"
   })
@@ -108,11 +108,15 @@ class RouletteScene
       end  
       @indexX = x
       @indexY = y
-      @sprite.x=@tableX-2+@indexX*48
+      refreshSpritePos
+      resetframeCount
+    end
+
+    def refreshSpritePos(extraX=0)
+      @sprite.x=@tableX-2+@indexX*48+extraX
       @sprite.x+=4 if @indexX==0 
       @sprite.y=@tableY-2+@indexY*48
       @sprite.y+=4 if @indexY==0 
-      resetframeCount
     end
     
     def bentPositions
@@ -179,11 +183,15 @@ class RouletteScene
       @balls[i].oy=balls[i].bitmap.height
     end  
     
-    def sumX(value)
-      @roulette.x+=value
+    def x=(value)
+      @roulette.x=value
       for ball in @balls
-        ball.x+=value
+        ball.x=value
       end  
+    end
+    
+    def y=(value)
+      @roulette.y=value
     end
     
     def sumAngle(value)
@@ -211,22 +219,16 @@ class RouletteScene
       @sprites["background"].bitmap.height, @backgroundColor
     )
     @sprites["roulette"]=IconSprite.new(0,0,@viewport)
-    @sprites["roulette"].setBitmap("Graphics/Pictures/Roulette/roulette")
-    @sprites["roulette"].x=@sprites["roulette"].bitmap.width/2+4
-    @sprites["roulette"].y=Graphics.height/2    
+    @sprites["roulette"].setBitmap("Graphics/Pictures/Roulette/roulette")    
     @sprites["roulette"].ox=@sprites["roulette"].bitmap.width/2
     @sprites["roulette"].oy=@sprites["roulette"].bitmap.height/2
     @roulette=RouletteObject.new(@sprites["roulette"])
     @sprites["table"]=IconSprite.new(0,0,@viewport)
     @sprites["table"].setBitmap("Graphics/Pictures/Roulette/table")
-    @sprites["table"].x=Graphics.width-@sprites["table"].bitmap.width-10
-    @sprites["table"].y=Graphics.height-@sprites["table"].bitmap.height-10
     @sprites["multiplierbox"]=IconSprite.new(0,0,@viewport)
     @sprites["multiplierbox"].setBitmap(
       "Graphics/Pictures/Roulette/multiplierbox"
     )
-    @sprites["multiplierbox"].x=@sprites["table"].x-14
-    @sprites["multiplierbox"].y=@sprites["table"].y+6
     @sprites["multiplierbox"].z=1
     @multiplierBoxUnclampedX = @sprites["multiplierbox"].x
     @sprites["creditbox"]=IconSprite.new(0,0,@viewport)
@@ -253,9 +255,6 @@ class RouletteScene
     (COLUMNS*ROWS).times do
       @playedBalls.push(false)
     end
-    @cursor = Cursor.new(
-      @sprites["cursor"],@playedBalls,@sprites["table"].x,@sprites["table"].y
-    )
     @sprites["overlaycredits"]=BitmapSprite.new(
         Graphics.width,Graphics.height,@viewport
     )
@@ -276,13 +275,47 @@ class RouletteScene
     @framesRemainingToBlink = 0
     @displayedCredits = RouletteBridge.coins
     @exit=false
+    @tableBallPosArray = []
+    refreshBottomElementsPos
+    @cursor = Cursor.new(
+      @sprites["cursor"],@playedBalls,@sprites["table"].x,@sprites["table"].y
+    )
     drawCredits
     pbFadeInAndShow(@sprites) { update }
     displayMessage(
       _INTL("Place your wager with the arrows, then press the C key.")
     )
     drawMultiplier
-  end  
+  end
+
+  def refreshBottomElementsPos
+    @cursor.refreshSpritePos(@movedDistance) if @cursor
+    # Roulette
+    @roulette.x = [
+      @sprites["roulette"].bitmap.width/2+4 + @movedDistance/2,
+      (Graphics.width)/2 # @sprites["roulette"].bitmap.width+
+    ].min
+    @roulette.y = Graphics.height/2
+    # Table
+    @sprites["table"].x = (
+      Graphics.width-@sprites["table"].bitmap.width-10 + @movedDistance
+    )
+    @sprites["table"].y=Graphics.height-@sprites["table"].bitmap.height-10
+    for i in 0...@tableBallPosArray.size
+      @sprites["balltable#{i}"].x = @tableBallPosArray[i][0] + @movedDistance
+      @sprites["balltable#{i}"].y = @tableBallPosArray[i][1]
+    end
+    # Multiplier
+    baseMultiplierBoxX = @sprites["table"].x-14
+    @sprites["multiplierbox"].x = [
+      baseMultiplierBoxX,
+      Graphics.width-@sprites["multiplierbox"].bitmap.width-10
+    ].min
+    @sprites["multiplierbox"].y=@sprites["table"].y+6
+    @sprites["overlaymultiplier"].x = (
+      @movedDistance + @sprites["multiplierbox"].x - baseMultiplierBoxX
+    )
+  end
   
   def update
     pbUpdateSpriteHash(@sprites)
@@ -378,20 +411,7 @@ class RouletteScene
     speed = 12
     speed *= - 1 if !@centralizeRoulette # Reverse the way
     @movedDistance+=speed
-    @roulette.sumX(speed/3)
-    @sprites["table"].x+=speed
-    for i in 0...RouletteScreen.count(@playedBalls,true)
-      @sprites["balltable#{i}"].x+=speed
-    end
-    @sprites["cursor"].x+=speed
-    @multiplierBoxUnclampedX+=speed
-    @sprites["multiplierbox"].x = [
-      @multiplierBoxUnclampedX,
-      Graphics.width-@sprites["multiplierbox"].bitmap.width-10
-    ].min
-    @sprites["overlaymultiplier"].x = (
-      @movedDistance+@sprites["multiplierbox"].x-@multiplierBoxUnclampedX
-    )
+    refreshBottomElementsPos
     # The conditions for finish centralize and decentralize
     if ( 
       @centralizeRoulette && Graphics.width<(@sprites["table"].x) ||
@@ -469,10 +489,12 @@ class RouletteScene
   BLINK_LAST_WAIT = 2
 
   def endSpin
-    i=RouletteScreen.count(@playedBalls,true)
-    @sprites["balltable#{i}"].x=6+@sprites["table"].x+(@result%COLUMNS+1)*48
-    @sprites["balltable#{i}"].y=6+@sprites["table"].y+(@result/COLUMNS+1)*48
+    @tableBallPosArray.push([
+      6+@sprites["table"].x+(@result%COLUMNS+1)*48, 
+      6+@sprites["table"].y+(@result/COLUMNS+1)*48
+    ])
     @framesRemainingToBlink = (BLINK_TIMES+BLINK_LAST_WAIT)*FRAMES_PER_BLINK*2
+    refreshBottomElementsPos
   end
 
   def blink
@@ -511,6 +533,7 @@ class RouletteScene
       displayMessage(_INTL("The Roulette board will be cleared."))
       @roulette.clearBalls
       @playedBalls.clear
+      @tableBallPosArray.clear
       (COLUMNS*ROWS).times do
         @playedBalls.push(false)
       end  
