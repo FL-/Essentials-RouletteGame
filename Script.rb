@@ -31,12 +31,18 @@
 # You can use 'roulette(1, RouletteScreen::BLUE)' to start the game with a 
 # different board color set. Available color sets are RED, GREEN and BLUE.
 #
+#=== NOTES =====================================================================
+#
+# Besides the already defined constants, you can pass any two position color
+# array as the second parameter. The first color is the background, the second
+# is the used ball icon.
+#
 #===============================================================================
 
 if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
   PluginManager.register({                                                 
     :name    => "Roulette Minigame",                                        
-    :version => "1.1.1",                                                     
+    :version => "1.1.2",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
     :credits => "FL"
   })
@@ -564,9 +570,9 @@ class RouletteScene
 end
 
 class RouletteScreen
-  RED   = 101
-  GREEN = 102
-  BLUE  = 103
+  RED   = [Color.new(0xc0,0x20,0x50), Color.new(0xf8,0x98,0xa0)]
+  GREEN = [Color.new(0x51,0x96,0x31), Color.new(0x84,0xdd,0x57)]
+  BLUE  = [Color.new(0x20,0x50,0xc0), Color.new(0x98,0xa0,0xf8)]
 
   # Added since Ruby 1.8 Array class doesn't have count
   def self.count(array, value)
@@ -581,13 +587,8 @@ class RouletteScreen
     @scene=scene
   end
 
-  def startScreen(wager, colorCode)
-    colorCode ||= RED 
-    backgroundAndIconColor = {
-      RED   => [Color.new(0xc0,0x20,0x50), Color.new(0xf8,0x98,0xa0)],
-      GREEN => [Color.new(0x51,0x96,0x31), Color.new(0x84,0xdd,0x57)],
-      BLUE  => [Color.new(0x20,0x50,0xc0), Color.new(0x98,0xa0,0xf8)],
-    }[colorCode]
+  def startScreen(wager, backgroundAndIconColor)
+    backgroundAndIconColor ||= RED 
     @scene.startScene(
       wager,backgroundAndIconColor[0],backgroundAndIconColor[1]
     )
@@ -596,7 +597,7 @@ class RouletteScreen
   end
 end
 
-def roulette(wager=1, colorCode=nil)
+def roulette(wager=1, backgroundAndIconColor=nil)
   if !RouletteBridge.hasCoinCase?
     Kernel.pbMessage(_INTL("It's a Roulette."))
   elsif Kernel.pbConfirmMessage(_INTL(
@@ -610,7 +611,7 @@ def roulette(wager=1, colorCode=nil)
       pbFadeOutIn(99999){     
         scene=RouletteScene.new
         screen=RouletteScreen.new(scene)
-        screen.startScreen(wager, colorCode)
+        screen.startScreen(wager, backgroundAndIconColor)
       }
     end
   end
