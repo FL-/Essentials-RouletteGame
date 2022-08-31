@@ -42,7 +42,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
   PluginManager.register({                                                 
     :name    => "Roulette Minigame",                                        
-    :version => "1.1.2",                                                     
+    :version => "1.1.3",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
     :credits => "FL"
   })
@@ -345,7 +345,7 @@ class RouletteScene
     }.fetch(multiplier, Color.new(0xf8,0xa8,0x88)) # Default Red
     textPosition=[multiplier.to_s,
        @sprites["multiplierbox"].x+@sprites["multiplierbox"].bitmap.width-8,
-       @sprites["multiplierbox"].y-6,true,baseColor,Color.new(0x60,0x60,0x70)
+       @sprites["multiplierbox"].y+6,true,baseColor,Color.new(0x60,0x60,0x70)
     ]
     RouletteBridge.drawTextPositions(overlay,[textPosition])
   end
@@ -355,7 +355,7 @@ class RouletteScene
     overlay.clear     
     textPosition=[@displayedCredits.to_s,
         @sprites["creditbox"].x+@sprites["creditbox"].bitmap.width-26,
-        @sprites["creditbox"].y+20,
+        @sprites["creditbox"].y+32,
         true,Color.new(248,248,248),Color.new(0,0,0)
     ]
     RouletteBridge.drawTextPositions(overlay,[textPosition])
@@ -365,7 +365,7 @@ class RouletteScene
   def addCredits(number, instant=true)
     return false if RouletteBridge.coins+number<0
     RouletteBridge.coins = [
-      RouletteBridge.getMaxCoins, RouletteBridge.coins+number
+      RouletteBridge.maxCoins, RouletteBridge.coins+number
     ].min
     if instant
       @displayedCredits = RouletteBridge.coins
@@ -375,11 +375,11 @@ class RouletteScene
   end  
   
   def displayMessage(message)
-    Kernel.pbMessage(message){update}
+    RouletteBridge.message(message){update}
   end  
   
   def confirmMessage(message)
-    return Kernel.pbConfirmMessage(message){update}
+    return RouletteBridge.confirmMessage(message){update}
   end  
   
   def main
@@ -599,14 +599,14 @@ end
 
 def roulette(wager=1, backgroundAndIconColor=nil)
   if !RouletteBridge.hasCoinCase?
-    Kernel.pbMessage(_INTL("It's a Roulette."))
-  elsif Kernel.pbConfirmMessage(_INTL(
+    RouletteBridge.message(_INTL("It's a Roulette."))
+  elsif RouletteBridge.confirmMessage(_INTL(
     "\\CNThe minimum wanger at this table is {1}. Do you want to play?", wager
   ))
     if RouletteBridge.coins<wager
-      Kernel.pbMessage(_INTL("You don't have enough Coins to play!"))
-    elsif RouletteBridge.coins==RouletteBridge.getMaxCoins
-      Kernel.pbMessage(_INTL("Your Coin Case is full!"))  
+      RouletteBridge.message(_INTL("You don't have enough Coins to play!"))
+    elsif RouletteBridge.coins==RouletteBridge.maxCoins
+      RouletteBridge.message(_INTL("Your Coin Case is full!"))  
     else
       pbFadeOutIn(99999){     
         scene=RouletteScene.new
@@ -619,54 +619,74 @@ end
 
 # Essentials multiversion layer
 module RouletteBridge
+  if defined?(Essentials)
+    MAJOR_VERSION = Essentials::VERSION.split(".")[0].to_i
+  elsif defined?(ESSENTIALS_VERSION)
+    MAJOR_VERSION = ESSENTIALS_VERSION.split(".")[0].to_i
+  elsif defined?(ESSENTIALSVERSION)
+    MAJOR_VERSION = ESSENTIALSVERSION.split(".")[0].to_i
+  else
+    MAJOR_VERSION = 0
+  end
+
   @@audioNameHash = nil
 
-  def self.v19Plus?
-    return defined?(Settings) && Settings.const_defined?(:MAX_COINS)
+  module_function
+
+  def message(string, &block)
+    return Kernel.pbMessage(string, &block) if MAJOR_VERSION < 20
+    return pbMessage(string, &block)
   end
 
-  def self.v18?
-    return defined?(MAX_COINS)
+  def confirmMessage(string, &block)
+    return Kernel.pbConfirmMessage(string, &block) if MAJOR_VERSION < 20
+    return pbConfirmMessage(string, &block)
   end
 
-  def self.v17?
-    return defined?(MEGARINGS)
-  end
-
-  def self.v17Plus?
-    return v17? || v18? || v19Plus?
-  end
-
-  def self.coins
-    return (v19Plus? ? $Trainer : $PokemonGlobal).coins
-  end
-
-  def self.coins=(value)
-    (v19Plus? ? $Trainer : $PokemonGlobal).coins = value
-  end
-
-  def self.getMaxCoins
-    return Settings::MAX_COINS if v19Plus?
-    return MAX_COINS if v18?
-    return MAXCOINS
-  end
-
-  def self.hasCoinCase?
-    return $PokemonBag.pbQuantity(v19Plus? ? :COINCASE : PBItems::COINCASE) > 0
-  end
-
-  def self.drawTextPositions(bitmap,textpos)
-    if !v19Plus?
+  def drawTextPositions(bitmap,textpos)
+    if MAJOR_VERSION < 20
       for singleTextPos in textpos
-        singleTextPos[2]+=6
+        singleTextPos[2] -= MAJOR_VERSION==19 ? 12 : 6
       end
     end
     return pbDrawTextPositions(bitmap,textpos)
   end
+  
+  def coinHolder
+    return case MAJOR_VERSION
+      when 0..18; $PokemonGlobal
+      when 19;    $Trainer
+      else        $player
+    end
+  end
 
-  def self.getAudioName(baseName)
+  def coins
+    return coinHolder.coins
+  end
+
+  def coins=(value)
+    coinHolder.coins = value
+  end
+
+  def maxCoins
+    return case MAJOR_VERSION
+      when 0..17; MAXCOINS
+      when 18;    MAX_COINS
+      else        Settings::MAX_COINS
+    end
+  end
+
+  def hasCoinCase?
+    return case MAJOR_VERSION
+      when 0..18; $PokemonBag.pbQuantity(PBItems::COINCASE) > 0
+      when 19;    $PokemonBag.pbHasItem?(:COINCASE)
+      else        $bag.has?(:COINCASE)
+    end
+  end
+
+  def getAudioName(baseName)
     if !@@audioNameHash
-      if !v17Plus?
+      if MAJOR_VERSION < 17
         @@audioNameHash = {
           "Battle ball drop" => "balldrop"   ,
           "Slots coin"       => "SlotsCoin"  ,
