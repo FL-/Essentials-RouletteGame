@@ -42,7 +42,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
   PluginManager.register({                                                 
     :name    => "Roulette Minigame",                                        
-    :version => "1.1.4",                                                     
+    :version => "1.1.5",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
     :credits => "FL"
   })
@@ -555,7 +555,7 @@ module Roulette
         displayMessage(_INTL("Nothing doing!"))
       end
       @playedBalls[@result]=true
-      if Roulette.count(@playedBalls,true)==(ROUNDS-1) # Clear
+      if Roulette.count(@playedBalls,true)==ROUNDS # Clear
         displayMessage(_INTL("The Roulette board will be cleared."))
         @roulette.clearBalls
         @playedBalls.clear
