@@ -42,7 +42,7 @@
 if defined?(PluginManager) && !PluginManager.installed?("Roulette Minigame")
   PluginManager.register({                                                 
     :name    => "Roulette Minigame",                                        
-    :version => "1.1.5",                                                     
+    :version => "1.1.6",                                                     
     :link    => "https://www.pokecommunity.com/showthread.php?t=318598",             
     :credits => "FL"
   })
@@ -262,13 +262,17 @@ module Roulette
         @sprites["balltable#{i}"]=IconSprite.new(0,0,@viewport)
         @sprites["balltable#{i}"].setBitmap("Graphics/UI/Roulette/ball")
         @sprites["balltable#{i}"].visible=false
-        @sprites["ballicon#{i}"]=IconSprite.new(0,0,@viewport)
-        @sprites["ballicon#{i}"].setBitmap("Graphics/UI/Roulette/ballicon")
-        # Right to left
-        @sprites["ballicon#{i}"].x=(@sprites["creditbox"].x+10+(ROUNDS-i-1)*16)
-        @sprites["ballicon#{i}"].y=(
-            @sprites["creditbox"].y+@sprites["creditbox"].bitmap.height+2
-        )
+        if ROUNDS!=1
+          @sprites["ballicon#{i}"]=IconSprite.new(0,0,@viewport)
+          @sprites["ballicon#{i}"].setBitmap("Graphics/UI/Roulette/ballicon")
+          # Right to left
+          @sprites["ballicon#{i}"].x=(
+            @sprites["creditbox"].x+10+(ROUNDS-i-1)*16
+          )
+          @sprites["ballicon#{i}"].y=(
+              @sprites["creditbox"].y+@sprites["creditbox"].bitmap.height+2
+          )
+        end
       end  
       @sprites["cursor"]=IconSprite.new(0,0,@viewport)
       @playedBalls=[]
@@ -456,8 +460,10 @@ module Roulette
     
     def startSpin
       i=Roulette.count(@playedBalls,true)
-      @sprites["ballicon#{i}"].setBitmap("Graphics/UI/Roulette/ballusedicon")
-      @sprites["ballicon#{i}"].color=@usedIconColor
+      if ROUNDS!=1
+        @sprites["ballicon#{i}"].setBitmap("Graphics/UI/Roulette/ballusedicon")
+        @sprites["ballicon#{i}"].color=@usedIconColor
+      end
       @result=-1    
       loop do
         @result = rand(@playedBalls.size)
@@ -556,18 +562,22 @@ module Roulette
       end
       @playedBalls[@result]=true
       if Roulette.count(@playedBalls,true)==ROUNDS # Clear
-        displayMessage(_INTL("The Roulette board will be cleared."))
+        if ROUNDS!=1
+          displayMessage(_INTL("The Roulette board will be cleared."))
+        end
         @roulette.clearBalls
         @playedBalls.clear
         @tableBallPosArray.clear
         (COLUMNS*ROWS).times do
           @playedBalls.push(false)
-        end  
+        end
         for i in 0...ROUNDS
           @sprites["balltable#{i}"].visible=false
-          @sprites["ballicon#{i}"].setBitmap("Graphics/UI/Roulette/ballicon")
-          @sprites["ballicon#{i}"].color=Color.new(0,0,0,0)
-        end  
+          if ROUNDS!=1
+            @sprites["ballicon#{i}"].setBitmap("Graphics/UI/Roulette/ballicon")
+            @sprites["ballicon#{i}"].color=Color.new(0,0,0,0)
+          end
+        end 
       end  
       drawMultiplier
       if confirmMessage(_INTL("Keep playing?"))
